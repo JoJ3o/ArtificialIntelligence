@@ -8,7 +8,6 @@ from threading import Timer
 import mss
 
 crouching = False
-oneShot = False
 killBot = False
 
 replaybtn = (950, 415)
@@ -35,7 +34,7 @@ def GrabImage():
     grayImage = ImageOps.grayscale(image)
     a = array(grayImage.getcolors())
     newTime = int((time.time() - prevTime) * 1000)
-    return a.sum()  # newTime
+    return a.sum(), newTime
 
 
 def pressSpace():
@@ -48,7 +47,8 @@ def holdDown():
 
 
 def getColor():
-    return GrabImage()
+    print(GrabImage()[0])
+    return GrabImage()[0]
 
 
 def onPress(key):
@@ -59,7 +59,12 @@ def onPress(key):
 
     global killBot
     if k == "esc":
-        killBot = True
+        killScript()
+
+
+def killScript():
+    global killBot
+    killBot = True
 
 
 listener = keyboard.Listener(on_press=onPress)
@@ -67,15 +72,14 @@ listener.start()
 
 time.sleep(2)
 restartGame()
+Timer(10, killScript).start()
+
+color = getColor()
 
 while True:
-    GrabImage()
-    if oneShot == False:
-        color = getColor()
-        print(color)
-        oneShot = True
+    image = GrabImage()
 
-    if (GrabImage() != color):
+    if (image[0] != color):
         pressSpace()
         crouching = True
 
@@ -84,8 +88,13 @@ while True:
     #     jumpTimer.start()
     #     crouching = False
 
+    if image[0] != color:
+        colorChange = True
+    else:
+        colorChange = False
+
     x += 1
-    print(x, GrabImage())
+    print(x, colorChange, image[1])
 
     if killBot == True:
         break
