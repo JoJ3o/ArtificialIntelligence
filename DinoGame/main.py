@@ -31,6 +31,17 @@ class ThreadWithReturnValue(Thread):
         return self._return
 
 
+class EdgeTrigger(object):
+    def __init__(self, callback):
+        self.value = None
+        self.callback = callback
+
+    def __call__(self, value):
+        if value != self.value:
+            self.callback(self.value, value)
+        self.value = value
+
+
 # Functions
 crouching = False
 killBot = False
@@ -45,7 +56,7 @@ def restartGame():
     # resetTimer.start()
 
 
-def grabImagePIL(coordinates):
+def grabImagePIL(coordinates, currentColor, timeTaken):
     prevTime = time.time()
     box = (coordinates[0], coordinates[1],
            coordinates[0]+10, coordinates[1]+5)
@@ -53,10 +64,12 @@ def grabImagePIL(coordinates):
     grayImage = ImageOps.grayscale(image)
     a = array(grayImage.getcolors())
     newTime = int((time.time() - prevTime) * 1000)
+    currentColor[0] = a.sum()
+    timeTaken[0] = newTime
     return a.sum(), newTime
 
 
-def grabImageMss(coordinates):
+def grabImageMss(coordinates, currentColor, timeTaken, running):
     prevTime = time.time()
     image = mss.mss().grab(
         {"top": coordinates[1], "left": coordinates[0], "width": 10, "height": 5})
@@ -64,8 +77,15 @@ def grabImageMss(coordinates):
         "RGB", image.size, image.bgra, "raw", "BGRX")
     grayImage = ImageOps.grayscale(imageConvert)
     a = array(grayImage.getcolors())
+    # print(currentColor)
+    # print(timeTaken)
     newTime = int((time.time() - prevTime) * 1000)
-    return a.sum(), newTime
+    currentColor[0] = a.sum()
+    timeTaken[0] = newTime
+    print("Time: {0}".format(newTime))
+    if running[0]:
+        grabImageMss(dinosaur, currentColor, timeTaken, running)
+    # return a.sum(), newTime
 
 
 def pressSpace():
@@ -75,11 +95,6 @@ def pressSpace():
 
 def holdDown():
     pyautogui.keyDown('down')
-
-
-def getColor(coordinates):
-    print(grabImageMss(coordinates)[0])
-    return grabImageMss(coordinates)[0]
 
 
 def onPress(key):
@@ -93,9 +108,8 @@ def onPress(key):
         killScript()
 
 
-def killScript():
-    global killBot
-    killBot = True
+def killScript(running):
+    running[0] = False
 
 
 def getImage():
@@ -109,23 +123,34 @@ def increaseX(number):
     return number
 
 
+def printValues(oldVal, newVal):
+    print("Value changed from {0} to {1}.".format(oldVal, newVal))
+
+
 # Program
+running = [True]
+Timer(5, killScript, args=(running,)).start()
+
 listener = keyboard.Listener(on_press=onPress)
 listener.start()
 
 time.sleep(2)
 restartGame()
-Timer(10, killScript).start()
 
 dinosaur = (717+100, 432)
-color = getColor(dinosaur)
 x = 0
+currentColor = [0]
+timeTaken = [0]
+newValue = 1
+# defaultColor = grabImageMss(dinosaur, currentColor, timeTaken, running)
 
-while True:
-    imageThread = ThreadWithReturnValue(target=getImage)
-    imageThread.start()
-    # imageInfo = imageThread.join()
+Thread(target=grabImageMss, args=(
+    dinosaur, currentColor, timeTaken, running)).start()
 
+# print("Default color: " + str(defaultColor))
+detector = EdgeTrigger(printValues)
+
+while running[0]:
     # if (image[0] != color):
     #     pressSpace()
     #     crouching = True
@@ -143,7 +168,9 @@ while True:
     newX = increaseX(x)
     x = newX
 
-    print(x)
+    # print(timeTaken[0])
 
-    if killBot == True:
-        break
+    # if timeTaken[0] != newValue:
+    #     print(timeTaken[0])
+
+    newValue = timeTaken[0]
